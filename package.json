@@ -2,7 +2,7 @@
   "name": "js-unicode-preview",
   "displayName": "JS Unicode Preview",
   "description": "Show previews for unicode escape sequences",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/kufii/vscode-js-unicode-preview"
