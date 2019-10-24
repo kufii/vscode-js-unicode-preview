@@ -32,15 +32,19 @@ const setUnicodeDecorators = (editor, type) => {
     });
   };
 
-  const addWithoutPairs = match => {
-    const hex = parseInt(match[1], 16);
+  const addWithoutPairs = (base = 16) => match => {
+    const code = parseInt(match[1], base);
     const startPos = match.index;
     const endPos = startPos + match[0].length;
-    addDecorator(String.fromCodePoint(hex), startPos, endPos);
+    addDecorator(String.fromCodePoint(code), startPos, endPos);
   };
+  const addHex = addWithoutPairs();
+  const addOctal = addWithoutPairs(8);
 
   const addWithPairs = match => {
-    const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, match[0]).map(([, hex]) => parseInt(hex, 16));
+    const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, match[0]).map(([_, hex]) =>
+      parseInt(hex, 16)
+    );
 
     for (let i = 0; i < chars.length; i++) {
       const firstPair = chars[i];
@@ -56,9 +60,10 @@ const setUnicodeDecorators = (editor, type) => {
     }
   };
 
-  getMatches(/\\u\{([0-9A-Fa-f]+)\}/gu, text).forEach(addWithoutPairs);
-  getMatches(/\\x([0-9A-Fa-f]{2})/gu, text).forEach(addWithoutPairs);
+  getMatches(/\\u\{([0-9A-Fa-f]+)\}/gu, text).forEach(addHex);
+  getMatches(/\\x([0-9A-Fa-f]{2})/gu, text).forEach(addHex);
   getMatches(/(?:\\u[0-9A-Fa-f]{4})+/gu, text).forEach(addWithPairs);
+  getMatches(/\\([0-7]{1,3})/gu, text).forEach(addOctal);
 
   editor.setDecorations(type, decorators);
 };
