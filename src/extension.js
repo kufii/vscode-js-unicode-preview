@@ -90,20 +90,16 @@ const setUnicodeDecorators = (editor, type) => {
     return mergeModifiers(decorators);
   };
 
-  getMatches(/\\([0-7]{1,3})/gu, text)
-    .map(getDecoratorPosition(8))
-    .forEach(addDecorator);
-  getMatches(/\\x([0-9A-Fa-f]{2})/gu, text)
-    .map(getDecoratorPosition(16))
-    .forEach(addDecorator);
-  getMatches(/(?:\\u\{[0-9A-Fa-f]+\})+/gu, text)
-    .map(getDecoratorPositionsForUnicodeCodePoints)
-    .flat()
-    .forEach(addDecorator);
-  getMatches(/(?:\\u[0-9A-Fa-f]{4})+/gu, text)
-    .map(getDecoratorPositionsForUnicodePairs)
-    .flat()
-    .forEach(addDecorator);
+  [
+    ...getMatches(/\\([0-7]{1,3})/gu, text).map(getDecoratorPosition(8)),
+    ...getMatches(/\\x([0-9A-Fa-f]{2})/gu, text).map(getDecoratorPosition(16)),
+    ...getMatches(/(?:\\u\{[0-9A-Fa-f]+\})+/gu, text)
+      .map(getDecoratorPositionsForUnicodeCodePoints)
+      .flat(),
+    ...getMatches(/(?:\\u[0-9A-Fa-f]{4})+/gu, text)
+      .map(getDecoratorPositionsForUnicodePairs)
+      .flat()
+  ].forEach(addDecorator);
 
   editor.setDecorations(type, decorators);
 };
