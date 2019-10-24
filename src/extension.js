@@ -1,7 +1,7 @@
 'use strict';
 
 const vscode = require('vscode');
-const { getMatches, isUnicodePair, getSettings, curry } = require('./util');
+const { getMatches, isUnicodePair, isUnicodeModifier, getSettings, curry } = require('./util');
 
 let config;
 
@@ -14,7 +14,7 @@ const setUnicodeDecorators = (editor, type) => {
   const text = editor.document.getText();
   const decorators = [];
 
-  const addDecorator = (text, startPos, endPos) => {
+  const addDecorator = ({ text, startPos, endPos }) => {
     decorators.push({
       range: new vscode.Range(
         editor.document.positionAt(startPos),
@@ -34,15 +34,42 @@ const setUnicodeDecorators = (editor, type) => {
 
   const matchToNum = curry((base, [_, capture]) => parseInt(capture, base));
 
-  const addWithoutPairs = curry((base, match) => {
+  const getDecoratorPosition = curry((base, match) => {
     const code = matchToNum(base, match);
     const startPos = match.index;
     const endPos = startPos + match[0].length;
-    addDecorator(String.fromCodePoint(code), startPos, endPos);
+    return { text: String.fromCodePoint(code), startPos, endPos };
   });
 
-  const addWithPairs = match => {
+  const mergeModifiers = decorators => {
+    let current;
+    const merged = [];
+    decorators.forEach(d => {
+      if (!current) current = d;
+      else if (isUnicodeModifier(d.text)) {
+        current.endPos = d.endPos;
+        current.text += d.text;
+      } else {
+        merged.push(current);
+        current = d;
+      }
+    });
+    merged.push(current);
+    return merged;
+  };
+
+  const getDecoratorPositionsForUnicodeCodePoints = match =>
+    mergeModifiers(
+      getMatches(/\\u\{([0-9A-Fa-f]+)\}/gu, match[0]).map(m => ({
+        text: String.fromCodePoint(matchToNum(16, m)),
+        startPos: match.index + m.index,
+        endPos: match.index + m.index + m[0].length
+      }))
+    );
+
+  const getDecoratorPositionsForUnicodePairs = match => {
     const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, match[0]).map(matchToNum(16));
+    const decorators = [];
 
     for (let i = 0; i < chars.length; i++) {
       const firstPair = chars[i];
@@ -50,18 +77,33 @@ const setUnicodeDecorators = (editor, type) => {
       const startPos = match.index + i * 6;
       const endPos = startPos + 6;
       if (secondPair && isUnicodePair(firstPair, secondPair)) {
-        addDecorator(String.fromCharCode(firstPair, secondPair), startPos, endPos + 6);
+        decorators.push({
+          text: String.fromCharCode(firstPair, secondPair),
+          startPos,
+          endPos: endPos + 6
+        });
         i++;
       } else {
-        addDecorator(String.fromCodePoint(firstPair), startPos, endPos);
+        decorators.push({ text: String.fromCodePoint(firstPair), startPos, endPos });
       }
     }
+    return mergeModifiers(decorators);
   };
 
-  getMatches(/\\u\{([0-9A-Fa-f]+)\}/gu, text).forEach(addWithoutPairs(16));
-  getMatches(/\\x([0-9A-Fa-f]{2})/gu, text).forEach(addWithoutPairs(16));
-  getMatches(/(?:\\u[0-9A-Fa-f]{4})+/gu, text).forEach(addWithPairs);
-  getMatches(/\\([0-7]{1,3})/gu, text).forEach(addWithoutPairs(8));
+  getMatches(/\\([0-7]{1,3})/gu, text)
+    .map(getDecoratorPosition(8))
+    .forEach(addDecorator);
+  getMatches(/\\x([0-9A-Fa-f]{2})/gu, text)
+    .map(getDecoratorPosition(16))
+    .forEach(addDecorator);
+  getMatches(/(?:\\u\{[0-9A-Fa-f]+\})+/gu, text)
+    .map(getDecoratorPositionsForUnicodeCodePoints)
+    .flat()
+    .forEach(addDecorator);
+  getMatches(/(?:\\u[0-9A-Fa-f]{4})+/gu, text)
+    .map(getDecoratorPositionsForUnicodePairs)
+    .flat()
+    .forEach(addDecorator);
 
   editor.setDecorations(type, decorators);
 };

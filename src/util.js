@@ -2,12 +2,15 @@
 
 const vscode = require('vscode');
 
-const regexSymbolWithCombiningMarks = /(\P{Mark})(\p{Mark}+)/gu;
-const regexSurrogatePair = /([\uD800-\uDBFF])([\uDC00-\uDFFF])/g; // eslint-disable-line
+const regexSymbolWithCombiningMarks = /(\P{Mark})(\p{Mark}+)/u;
+const regexSurrogatePair = /([\uD800-\uDBFF])([\uDC00-\uDFFF])/; // eslint-disable-line
+const regexModifier = /\p{Modifier_Symbol}/iu;
 
 const isUnicodePair = (hex1, hex2) =>
-  String.fromCharCode(hex1, hex2).match(regexSymbolWithCombiningMarks) ||
-  String.fromCharCode(hex1, hex2).match(regexSurrogatePair);
+  regexSymbolWithCombiningMarks.test(String.fromCharCode(hex1, hex2)) ||
+  regexSurrogatePair.test(String.fromCharCode(hex1, hex2));
+
+const isUnicodeModifier = char => regexModifier.test(char);
 
 const getMatches = (regex, str) => {
   const matches = [];
@@ -34,4 +37,4 @@ const getSettings = (group, keys) => {
 const curry = fn => (...args) =>
   args.length < fn.length ? curry(fn.bind(null, ...args)) : fn(...args);
 
-module.exports = { isUnicodePair, getMatches, getSettings, curry };
+module.exports = { isUnicodePair, isUnicodeModifier, getMatches, getSettings, curry };
