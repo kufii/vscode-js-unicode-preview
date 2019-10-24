@@ -2,13 +2,10 @@
 
 const vscode = require('vscode');
 
-const regexSymbolWithCombiningMarks = /(\P{Mark})(\p{Mark}+)/u;
 const regexSurrogatePair = /([\uD800-\uDBFF])([\uDC00-\uDFFF])/; // eslint-disable-line
-const regexModifier = /\p{Modifier_Symbol}/iu;
+const regexModifier = /\p{Modifier_Symbol}|\p{Modifier_Letter}|\p{Nonspacing_Mark}/iu;
 
-const isUnicodePair = (hex1, hex2) =>
-  regexSymbolWithCombiningMarks.test(String.fromCharCode(hex1, hex2)) ||
-  regexSurrogatePair.test(String.fromCharCode(hex1, hex2));
+const isUnicodePair = (hex1, hex2) => regexSurrogatePair.test(String.fromCharCode(hex1, hex2));
 
 const isUnicodeModifier = char => regexModifier.test(char);
 
