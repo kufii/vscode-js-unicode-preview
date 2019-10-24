@@ -1,7 +1,7 @@
 'use strict';
 
 const vscode = require('vscode');
-const { getMatches, isUnicodePair, getSettings } = require('./util');
+const { getMatches, isUnicodePair, getSettings, curry } = require('./util');
 
 let config;
 
@@ -32,19 +32,17 @@ const setUnicodeDecorators = (editor, type) => {
     });
   };
 
-  const addWithoutPairs = (base = 16) => match => {
-    const code = parseInt(match[1], base);
+  const matchToNum = curry((base, [_, capture]) => parseInt(capture, base));
+
+  const addWithoutPairs = curry((base, match) => {
+    const code = matchToNum(base, match);
     const startPos = match.index;
     const endPos = startPos + match[0].length;
     addDecorator(String.fromCodePoint(code), startPos, endPos);
-  };
-  const addHex = addWithoutPairs();
-  const addOctal = addWithoutPairs(8);
+  });
 
   const addWithPairs = match => {
-    const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, match[0]).map(([_, hex]) =>
-      parseInt(hex, 16)
-    );
+    const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, match[0]).map(matchToNum(16));
 
     for (let i = 0; i < chars.length; i++) {
       const firstPair = chars[i];
@@ -60,10 +58,10 @@ const setUnicodeDecorators = (editor, type) => {
     }
   };
 
-  getMatches(/\\u\{([0-9A-Fa-f]+)\}/gu, text).forEach(addHex);
-  getMatches(/\\x([0-9A-Fa-f]{2})/gu, text).forEach(addHex);
+  getMatches(/\\u\{([0-9A-Fa-f]+)\}/gu, text).forEach(addWithoutPairs(16));
+  getMatches(/\\x([0-9A-Fa-f]{2})/gu, text).forEach(addWithoutPairs(16));
   getMatches(/(?:\\u[0-9A-Fa-f]{4})+/gu, text).forEach(addWithPairs);
-  getMatches(/\\([0-7]{1,3})/gu, text).forEach(addOctal);
+  getMatches(/\\([0-7]{1,3})/gu, text).forEach(addWithoutPairs(8));
 
   editor.setDecorations(type, decorators);
 };
@@ -80,6 +78,7 @@ class DecoratorProvider extends vscode.Disposable {
     vscode.window.onDidChangeActiveTextEditor(
       editor => {
         this.activeEditor = editor;
+        updateConfig();
         editor && this.triggerUpdateDecorations();
       },
       this,
@@ -112,6 +111,6 @@ class DecoratorProvider extends vscode.Disposable {
 
 module.exports.activate = context => {
   updateConfig();
-  vscode.workspace.onDidChangeConfiguration(() => updateConfig(), null, context.subscriptions);
+  vscode.workspace.onDidChangeConfiguration(updateConfig, null, context.subscriptions);
   context.subscriptions.push(new DecoratorProvider());
 };
