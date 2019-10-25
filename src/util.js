@@ -3,7 +3,7 @@
 const vscode = require('vscode');
 
 const regexSurrogatePair = /([\uD800-\uDBFF])([\uDC00-\uDFFF])/; // eslint-disable-line
-const regexModifier = /\p{Modifier_Symbol}|\p{Modifier_Letter}|\p{Nonspacing_Mark}/iu;
+const regexModifier = /\p{Modifier_Symbol}|\p{Mark}/iu;
 
 const isUnicodePair = (hex1, hex2) => regexSurrogatePair.test(String.fromCharCode(hex1, hex2));
 
