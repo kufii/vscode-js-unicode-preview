@@ -12,33 +12,21 @@ const setUnicodeDecorators = (editor, type) => {
   if (!editor || !config.languages.includes(editor.document.languageId)) return;
 
   const text = editor.document.getText();
-  const decorators = [];
 
-  const addDecorator = ({ text, startPos, endPos }) => {
-    decorators.push({
-      range: new vscode.Range(
-        editor.document.positionAt(startPos),
-        editor.document.positionAt(endPos)
-      ),
-      ...(config.hover && { hoverMessage: text }),
-      ...(config.inline && {
-        renderOptions: {
-          after: {
-            contentText: text,
-            color: 'rgba(255, 255, 255, 0.55)'
-          }
+  const toDecorator = ({ text, startPos, endPos }) => ({
+    range: new vscode.Range(
+      editor.document.positionAt(startPos),
+      editor.document.positionAt(endPos)
+    ),
+    ...(config.hover && { hoverMessage: text }),
+    ...(config.inline && {
+      renderOptions: {
+        after: {
+          contentText: text,
+          color: 'rgba(255, 255, 255, 0.55)'
         }
-      })
-    });
-  };
-
-  const matchToNum = curry((base, [_, capture]) => parseInt(capture, base));
-
-  const getDecoratorPosition = curry((base, match) => {
-    const code = matchToNum(base, match);
-    const startPos = match.index;
-    const endPos = startPos + match[0].length;
-    return { text: String.fromCodePoint(code), startPos, endPos };
+      }
+    })
   });
 
   const mergeModifiers = decorators => {
@@ -58,23 +46,25 @@ const setUnicodeDecorators = (editor, type) => {
     return merged;
   };
 
-  const getDecoratorPositionsForUnicodeCodePoints = match =>
-    mergeModifiers(
-      getMatches(/\\u\{([0-9A-Fa-f]+)\}/gu, match[0]).map(m => ({
-        text: String.fromCodePoint(matchToNum(16, m)),
-        startPos: match.index + m.index,
-        endPos: match.index + m.index + m[0].length
-      }))
-    );
+  const matchToNum = curry((base, [_, group]) => parseInt(group, base));
 
-  const getDecoratorPositionsForUnicodePairs = match => {
-    const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, match[0]).map(matchToNum(16));
+  const processNoPairs = curry((base, match, index) => {
+    const text = String.fromCodePoint(matchToNum(base, match));
+    const startPos = index;
+    const endPos = index + match[0].length;
+    return { text, startPos, endPos };
+  });
+  const processHex = processNoPairs(16);
+  const processOctal = processNoPairs(8);
+
+  const processWithPairs = (str, index) => {
+    const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, str).map(matchToNum(16));
     const decorators = [];
 
     for (let i = 0; i < chars.length; i++) {
       const firstPair = chars[i];
       const secondPair = i < chars.length - 1 && chars[i + 1];
-      const startPos = match.index + i * 6;
+      const startPos = index + i * 6;
       const endPos = startPos + 6;
       if (secondPair && isUnicodePair(firstPair, secondPair)) {
         decorators.push({
@@ -87,19 +77,38 @@ const setUnicodeDecorators = (editor, type) => {
         decorators.push({ text: String.fromCodePoint(firstPair), startPos, endPos });
       }
     }
+
+    return decorators;
+  };
+
+  const processSet = match => {
+    console.log(match[0]);
+    const parts = match[0]
+      .split(/(\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|(?:\\u[0-9A-Fa-f]{4})+|\\u\{[0-9A-Fa-f]+\})/u)
+      .filter(Boolean);
+    let index = match.index;
+    const decorators = [];
+    for (const part of parts) {
+      let match = part.match(/\\([0-7]{1,3})/u);
+      if (match) decorators.push(processOctal(match, index));
+      match = part.match(/\\x([0-9A-Fa-f]{2})/u);
+      if (match) decorators.push(processHex(match, index));
+      match = part.match(/\\u[0-9A-Fa-f]{4}/u);
+      if (match) decorators.push(...processWithPairs(part, index));
+      match = part.match(/\\u\{([0-9A-Fa-f]+)\}/u);
+      if (match) decorators.push(processHex(match, index));
+      index += part.length;
+    }
     return mergeModifiers(decorators);
   };
 
-  [
-    ...getMatches(/\\([0-7]{1,3})/gu, text).map(getDecoratorPosition(8)),
-    ...getMatches(/\\x([0-9A-Fa-f]{2})/gu, text).map(getDecoratorPosition(16)),
-    ...getMatches(/(?:\\u\{[0-9A-Fa-f]+\})+/gu, text)
-      .map(getDecoratorPositionsForUnicodeCodePoints)
-      .flat(),
-    ...getMatches(/(?:\\u[0-9A-Fa-f]{4})+/gu, text)
-      .map(getDecoratorPositionsForUnicodePairs)
-      .flat()
-  ].forEach(addDecorator);
+  const decorators = getMatches(
+    /(?:\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})+/gu,
+    text
+  )
+    .map(processSet)
+    .flat()
+    .map(toDecorator);
 
   editor.setDecorations(type, decorators);
 };
