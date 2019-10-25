@@ -82,11 +82,10 @@ const setUnicodeDecorators = (editor, type) => {
   };
 
   const processSet = match => {
-    console.log(match[0]);
     const parts = match[0]
       .split(/(\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|(?:\\u[0-9A-Fa-f]{4})+|\\u\{[0-9A-Fa-f]+\})/u)
       .filter(Boolean);
-    let index = match.index;
+    let index = match.index + match[1].length;
     const decorators = [];
     for (const part of parts) {
       let match = part.match(/\\([0-7]{1,3})/u);
@@ -103,7 +102,7 @@ const setUnicodeDecorators = (editor, type) => {
   };
 
   const decorators = getMatches(
-    /(?:\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})+/gu,
+    /((?<!\\)(?:(\\\\)*))(?:\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})+/gu,
     text
   )
     .map(processSet)
