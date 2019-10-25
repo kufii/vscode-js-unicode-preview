@@ -11,8 +11,6 @@ const updateConfig = () =>
 const setUnicodeDecorators = (editor, type) => {
   if (!editor || !config.languages.includes(editor.document.languageId)) return;
 
-  const text = editor.document.getText();
-
   const toDecorator = ({ text, startPos, endPos }) => ({
     range: new vscode.Range(
       editor.document.positionAt(startPos),
@@ -103,7 +101,7 @@ const setUnicodeDecorators = (editor, type) => {
 
   const decorators = getMatches(
     /((?<!\\)(?:(\\\\)*))(?:\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})+/gu,
-    text
+    editor.document.getText()
   )
     .map(processSet)
     .flat()
