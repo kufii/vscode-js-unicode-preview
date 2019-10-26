@@ -100,7 +100,7 @@ const setUnicodeDecorators = (editor, type) => {
   };
 
   const decorators = getMatches(
-    /((?<!\\)(?:(\\\\)*))(?:\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})+/gu,
+    /((?<!\\)(?:(\\\\)*))(?:\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\}|\\[0-2][0-7]{0,2}|\\3[0-6][0-7]?|\\37[0-7]?|\\[4-7][0-7]?)+/gu,
     editor.document.getText()
   )
     .map(processSet)
