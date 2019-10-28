@@ -11,6 +11,15 @@ const updateConfig = () =>
 const setUnicodeDecorators = (editor, type) => {
   if (!editor || !config.languages.includes(editor.document.languageId)) return;
 
+  const ifTrue = (bool, str) => (bool ? str : '');
+  const escapeRegex = '(?<!\\\\)(?:(\\\\\\\\)*)';
+  const octalRegex = group =>
+    `\\\\(${ifTrue(!group, '?:')}[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?)`;
+  const hexRegex = group => `\\\\x${ifTrue(group, '(')}[0-9A-Fa-f]{2}${ifTrue(group, ')')}`;
+  const unicodeRegex = group => `\\\\u${ifTrue(group, '(')}[0-9A-Fa-f]{4}${ifTrue(group, ')')}`;
+  const codePointRegex = group =>
+    `\\\\u\\{${ifTrue(group, '(')}[0-9A-Fa-f]+${ifTrue(group, ')')}\\}`;
+
   const toDecorator = ({ text, startPos, endPos }) => ({
     range: new vscode.Range(
       editor.document.positionAt(startPos),
@@ -56,7 +65,7 @@ const setUnicodeDecorators = (editor, type) => {
   const processOctal = processNoPairs(8);
 
   const processWithPairs = (str, index) => {
-    const chars = getMatches(/\\u([0-9A-Fa-f]{4})/gu, str).map(matchToNum(16));
+    const chars = getMatches(new RegExp(unicodeRegex(true), 'gu'), str).map(matchToNum(16));
     const decorators = [];
 
     for (let i = 0; i < chars.length; i++) {
@@ -81,18 +90,23 @@ const setUnicodeDecorators = (editor, type) => {
 
   const processSet = match => {
     const parts = match[0]
-      .split(/(\\[0-7]{1,3}|\\x[0-9A-Fa-f]{2}|(?:\\u[0-9A-Fa-f]{4})+|\\u\{[0-9A-Fa-f]+\})/u)
+      .split(
+        new RegExp(
+          `(${[octalRegex(), hexRegex(), codePointRegex()].join('|')}|(?:${unicodeRegex()})+)`,
+          'u'
+        )
+      )
       .filter(Boolean);
     let index = match.index + match[1].length;
     const decorators = [];
     for (const part of parts) {
-      let match = part.match(/\\([0-7]{1,3})/u);
+      let match = part.match(new RegExp(octalRegex(true), 'u'));
       if (match) decorators.push(processOctal(match, index));
-      match = part.match(/\\x([0-9A-Fa-f]{2})/u);
+      match = part.match(new RegExp(hexRegex(true), 'u'));
       if (match) decorators.push(processHex(match, index));
-      match = part.match(/\\u[0-9A-Fa-f]{4}/u);
+      match = part.match(new RegExp(unicodeRegex(), 'u'));
       if (match) decorators.push(...processWithPairs(part, index));
-      match = part.match(/\\u\{([0-9A-Fa-f]+)\}/u);
+      match = part.match(new RegExp(codePointRegex(true), 'u'));
       if (match) decorators.push(processHex(match, index));
       index += part.length;
     }
@@ -100,7 +114,12 @@ const setUnicodeDecorators = (editor, type) => {
   };
 
   const decorators = getMatches(
-    /((?<!\\)(?:(\\\\)*))(?:\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\}|\\[0-2][0-7]{0,2}|\\3[0-6][0-7]?|\\37[0-7]?|\\[4-7][0-7]?)+/gu,
+    new RegExp(
+      `(${escapeRegex})(?:${[octalRegex(), hexRegex(), unicodeRegex(), codePointRegex()].join(
+        '|'
+      )})+`,
+      'gu'
+    ),
     editor.document.getText()
   )
     .map(processSet)
