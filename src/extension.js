@@ -12,7 +12,7 @@ const setUnicodeDecorators = (editor, type) => {
   if (!editor || !config.languages.includes(editor.document.languageId)) return;
 
   const ifTrue = (bool, str) => (bool ? str : '');
-  const escapeRegex = '(?<!\\\\)(?:(\\\\\\\\)*)';
+  const escapeRegex = /(?<!\\)(?:(\\\\)*)/u.source;
   const octalRegex = group =>
     `\\\\(${ifTrue(!group, '?:')}[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?)`;
   const hexRegex = group => `\\\\x${ifTrue(group, '(')}[0-9A-Fa-f]{2}${ifTrue(group, ')')}`;
