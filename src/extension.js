@@ -30,7 +30,8 @@ const setUnicodeDecorators = (editor, type) => {
       renderOptions: {
         after: {
           contentText: text,
-          color: 'rgba(255, 255, 255, 0.55)'
+          color: new vscode.ThemeColor("tab.activeForeground"),
+          opacity: '0.55'
         }
       }
     })
